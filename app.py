@@ -6,7 +6,8 @@ MongoDB-backed backup monitoring with Web UI, Uptime Kuma, Prometheus & Webhook 
 from flask import Flask, request, jsonify, render_template, Response
 from pymongo import MongoClient, DESCENDING
 from datetime import datetime, timedelta
-import os, time, requests, logging, threading
+from functools import wraps
+import os, time, requests, logging, threading, secrets as _secrets
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -17,7 +18,25 @@ KUMA_URL = os.environ.get("KUMA_URL", "")
 KUMA_TOKEN = os.environ.get("KUMA_TOKEN", "")
 STALE_HOURS = int(os.environ.get("STALE_HOURS", "26"))
 
+# API Key Auth – set API_KEY to enable, leave empty to disable (open access)
+API_KEY = os.environ.get("API_KEY", "")
+
 db = MongoClient(MONGO_URI).backup_monitor
+
+
+# ── Auth Decorator ─────────────────────────────────────────────────────────
+
+def require_api_key(f):
+    """Protect write endpoints. Checks X-API-Key header or ?api_key= query param."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not API_KEY:
+            return f(*args, **kwargs)
+        key = request.headers.get("X-API-Key") or request.args.get("api_key")
+        if not key or key != API_KEY:
+            return jsonify({"error": "Unauthorized – invalid or missing API key"}), 401
+        return f(*args, **kwargs)
+    return decorated
 db.hosts.create_index("name", unique=True)
 db.history.create_index([("host", 1), ("timestamp", -1)])
 db.history.create_index("timestamp", expireAfterSeconds=90 * 86400)  # 90 Tage TTL
@@ -26,6 +45,7 @@ db.history.create_index("timestamp", expireAfterSeconds=90 * 86400)  # 90 Tage T
 # ── API: Push (called by borgmatic after_backup hook) ──────────────────────
 
 @app.route("/api/push", methods=["POST", "GET"])
+@require_api_key
 def push():
     host = request.args.get("host") or request.json.get("host", "") if request.is_json else request.args.get("host")
     if not host:
@@ -114,6 +134,7 @@ def list_hosts():
 
 
 @app.route("/api/hosts", methods=["POST"])
+@require_api_key
 def add_host():
     data = request.json
     name = data.get("name", "").strip()
@@ -129,6 +150,7 @@ def add_host():
 
 
 @app.route("/api/hosts/<name>", methods=["PUT"])
+@require_api_key
 def update_host(name):
     data = request.json
     update = {}
@@ -142,6 +164,7 @@ def update_host(name):
 
 
 @app.route("/api/hosts/<name>", methods=["DELETE"])
+@require_api_key
 def delete_host(name):
     db.hosts.delete_one({"name": name})
     db.history.delete_many({"host": name})
@@ -330,7 +353,7 @@ def _check_stale_hosts():
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", api_key_required=bool(API_KEY))
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────

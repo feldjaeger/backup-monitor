@@ -2,12 +2,35 @@
 
 const API = '';
 let refreshTimer;
+let apiKey = localStorage.getItem('bm_api_key') || '';
 
 // ── Init ──────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     loadAll();
     refreshTimer = setInterval(loadAll, 30000);
 });
+
+function authHeaders() {
+    const h = {'Content-Type': 'application/json'};
+    if (apiKey) h['X-API-Key'] = apiKey;
+    return h;
+}
+
+async function apiFetch(url, opts = {}) {
+    if (!opts.headers) opts.headers = {};
+    if (apiKey) opts.headers['X-API-Key'] = apiKey;
+    const r = await fetch(url, opts);
+    if (r.status === 401) {
+        const key = prompt('🔑 API-Key eingeben:');
+        if (key) {
+            apiKey = key;
+            localStorage.setItem('bm_api_key', key);
+            opts.headers['X-API-Key'] = key;
+            return fetch(url, opts);
+        }
+    }
+    return r;
+}
 
 async function loadAll() {
     await Promise.all([loadSummary(), loadHosts()]);
@@ -254,16 +277,16 @@ async function saveHost(e) {
     const enabled = document.getElementById('formEnabled').checked;
 
     if (mode === 'add') {
-        await fetch(`${API}/api/hosts`, {
+        await apiFetch(`${API}/api/hosts`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: authHeaders(),
             body: JSON.stringify({ name, kuma_push_url: kuma })
         });
         toast(`${name} hinzugefügt`, 'success');
     } else {
-        await fetch(`${API}/api/hosts/${name}`, {
+        await apiFetch(`${API}/api/hosts/${name}`, {
             method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
+            headers: authHeaders(),
             body: JSON.stringify({ kuma_push_url: kuma, enabled })
         });
         toast(`${name} aktualisiert`, 'success');
@@ -275,7 +298,7 @@ async function saveHost(e) {
 
 async function confirmDelete(name) {
     if (!confirm(`Host "${name}" und alle History wirklich löschen?`)) return;
-    await fetch(`${API}/api/hosts/${name}`, { method: 'DELETE' });
+    await apiFetch(`${API}/api/hosts/${name}`, { method: 'DELETE', headers: authHeaders() });
     toast(`${name} gelöscht`, 'success');
     closeDrawer();
     loadAll();
