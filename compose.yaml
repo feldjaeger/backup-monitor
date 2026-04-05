@@ -8,11 +8,14 @@ services:
     environment:
       - MONGO_URI=mongodb://mongo:27017
       - STALE_HOURS=26
+      # - API_KEY=your-secret-key
+      # - WEBHOOK_URLS=https://n8n.example.com/webhook/backup-alert
+      # - WEBHOOK_EVENTS=error,stale
     depends_on:
       - mongo
 
   mongo:
-    image: mongo:4.4
+    image: mongo:8
     container_name: backup-mongo
     restart: always
     volumes:

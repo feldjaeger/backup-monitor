@@ -1,0 +1,150 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "title": "Overview",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }] } } },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "options": { "colorMode": "background_solid", "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "expr": "backup_hosts_total", "legendFormat": "Total Hosts" }],
+      "title": "", "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }] } } },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "options": { "colorMode": "background_solid", "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "expr": "count(backup_host_status == 1)", "legendFormat": "Hosts OK" }],
+      "title": "", "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "orange", "value": null }] } } },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "options": { "colorMode": "background_solid", "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "expr": "count(backup_host_status == -1) or vector(0)", "legendFormat": "Stale" }],
+      "title": "", "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "red", "value": null }] } } },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "options": { "colorMode": "background_solid", "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "expr": "count(backup_host_status == 0) or vector(0)", "legendFormat": "Errors" }],
+      "title": "", "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "unit": "decbytes", "thresholds": { "steps": [{ "color": "blue", "value": null }] } } },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "options": { "colorMode": "background_solid", "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "expr": "backup_today_bytes", "legendFormat": "Today Volume" }],
+      "title": "", "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "purple", "value": null }] } } },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "options": { "colorMode": "background_solid", "graphMode": "area", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "expr": "backup_today_total", "legendFormat": "Today Backups" }],
+      "title": "", "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "title": "Host Status",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": true },
+          "mappings": [
+            { "options": { "1": { "color": "green", "text": "OK" }, "0": { "color": "red", "text": "ERROR" }, "-1": { "color": "orange", "text": "STALE" }, "-2": { "color": "text", "text": "DISABLED" } }, "type": "value" }
+          ]
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Status" }, "properties": [{ "id": "custom.cellOptions", "value": { "type": "color-text" } }] },
+          { "matcher": { "id": "byName", "options": "Age" }, "properties": [{ "id": "unit", "value": "s" }] },
+          { "matcher": { "id": "byName", "options": "Duration" }, "properties": [{ "id": "unit", "value": "s" }] },
+          { "matcher": { "id": "byName", "options": "Size" }, "properties": [{ "id": "unit", "value": "decbytes" }] },
+          { "matcher": { "id": "byName", "options": "Dedup" }, "properties": [{ "id": "unit", "value": "decbytes" }] }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 6 },
+      "options": { "showHeader": true, "sortBy": [{ "desc": false, "displayName": "Status" }] },
+      "targets": [
+        { "expr": "backup_host_status", "legendFormat": "{{host}}", "instant": true, "format": "table", "refId": "status" },
+        { "expr": "backup_host_last_seconds", "legendFormat": "{{host}}", "instant": true, "format": "table", "refId": "age" },
+        { "expr": "backup_host_duration_seconds", "legendFormat": "{{host}}", "instant": true, "format": "table", "refId": "duration" },
+        { "expr": "backup_host_size_bytes", "legendFormat": "{{host}}", "instant": true, "format": "table", "refId": "size" },
+        { "expr": "backup_host_dedup_bytes", "legendFormat": "{{host}}", "instant": true, "format": "table", "refId": "dedup" }
+      ],
+      "title": "All Hosts",
+      "type": "table",
+      "transformations": [
+        { "id": "joinByField", "options": { "byField": "host", "mode": "outer" } },
+        { "id": "organize", "options": {
+          "renameByName": { "Value #status": "Status", "Value #age": "Age", "Value #duration": "Duration", "Value #size": "Size", "Value #dedup": "Dedup" },
+          "excludeByName": { "Time": true, "Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "__name__": true, "__name__ 1": true, "__name__ 2": true, "__name__ 3": true, "__name__ 4": true, "instance": true, "job": true }
+        }}
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "title": "Trends",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } }, "unit": "decbytes" } },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "expr": "backup_host_size_bytes", "legendFormat": "{{host}}" }],
+      "title": "Backup Volume per Host",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 10 }, "unit": "s" } },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "expr": "backup_host_duration_seconds", "legendFormat": "{{host}}" }],
+      "title": "Backup Duration per Host",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "continuous-GrYlRd" }, "custom": { "fillOpacity": 70 }, "unit": "s", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 43200 }, { "color": "red", "value": 93600 }] } } },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 25 },
+      "options": { "legend": { "displayMode": "list", "placement": "right" }, "tooltip": { "mode": "single" } },
+      "targets": [{ "expr": "backup_host_last_seconds", "legendFormat": "{{host}}" }],
+      "title": "Time Since Last Backup (green < 12h, yellow < 26h, red > 26h)",
+      "type": "timeseries"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["backup", "borgmatic", "sentinel"],
+  "templating": {
+    "list": [
+      { "current": {}, "hide": 0, "name": "DS_PROMETHEUS", "type": "datasource", "query": "prometheus" }
+    ]
+  },
+  "time": { "from": "now-24h", "to": "now" },
+  "title": "🛡️ Backup Monitor – The Sentinel",
+  "uid": "backup-sentinel",
+  "version": 1
+}

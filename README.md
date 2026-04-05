@@ -206,9 +206,18 @@ The UI follows **The Sentinel** design language:
 ## Tech Stack
 
 - **Backend:** Python 3.12, Flask, Gunicorn
-- **Database:** MongoDB 4.4+
+- **Database:** MongoDB 8
 - **Frontend:** Tailwind CSS, Vanilla JS, Material Symbols, Google Fonts
 - **No build step** – Tailwind loaded via CDN
+
+## Grafana Dashboard
+
+Import `grafana-dashboard.json` into Grafana for a pre-built dashboard with:
+- Overview stat panels (Hosts OK, Stale, Errors, Volume, Backups Today)
+- Host status table with color-coded status, age, duration, size
+- Backup volume per host (stacked time series)
+- Backup duration per host
+- Time since last backup with threshold coloring (green/yellow/red)
 
 ## License
 
