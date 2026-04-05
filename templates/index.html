@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backup Monitor – Pfannkuchen</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+</head>
+<body>
+    <!-- ── Header ──────────────────────────────────────────── -->
+    <header>
+        <div class="header-left">
+            <span class="logo">🛡️</span>
+            <h1>Backup Monitor</h1>
+            <span class="subtitle">Homelab Pfannkuchen</span>
+        </div>
+        <div class="header-right">
+            <div class="pulse-dot" id="globalPulse"></div>
+            <span id="lastUpdate" class="meta-text"></span>
+            <button class="btn btn-icon" onclick="loadAll()" title="Aktualisieren">↻</button>
+            <button class="btn btn-primary" onclick="openAddHost()">+ Host</button>
+        </div>
+    </header>
+
+    <!-- ── Summary Cards ───────────────────────────────────── -->
+    <section class="summary-grid" id="summaryGrid">
+        <div class="card summary-card" id="cardTotal">
+            <div class="card-value" id="valTotal">–</div>
+            <div class="card-label">Hosts</div>
+        </div>
+        <div class="card summary-card card-ok" id="cardOk">
+            <div class="card-value" id="valOk">–</div>
+            <div class="card-label">OK</div>
+        </div>
+        <div class="card summary-card card-warn" id="cardStale">
+            <div class="card-value" id="valStale">–</div>
+            <div class="card-label">Überfällig</div>
+        </div>
+        <div class="card summary-card card-error" id="cardError">
+            <div class="card-value" id="valError">–</div>
+            <div class="card-label">Fehler</div>
+        </div>
+        <div class="card summary-card" id="cardToday">
+            <div class="card-value" id="valToday">–</div>
+            <div class="card-label">Heute</div>
+        </div>
+        <div class="card summary-card" id="cardSize">
+            <div class="card-value" id="valSize">–</div>
+            <div class="card-label">Heute gesichert</div>
+        </div>
+    </section>
+
+    <!-- ── Host Grid ───────────────────────────────────────── -->
+    <section class="host-grid" id="hostGrid"></section>
+
+    <!-- ── Detail Drawer ───────────────────────────────────── -->
+    <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+    <aside class="drawer" id="drawer">
+        <div class="drawer-header">
+            <h2 id="drawerTitle">Host Details</h2>
+            <button class="btn btn-icon" onclick="closeDrawer()">✕</button>
+        </div>
+        <div class="drawer-body" id="drawerBody"></div>
+    </aside>
+
+    <!-- ── Add/Edit Host Modal ─────────────────────────────── -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal()"></div>
+    <div class="modal" id="modal">
+        <div class="modal-header">
+            <h2 id="modalTitle">Host hinzufügen</h2>
+            <button class="btn btn-icon" onclick="closeModal()">✕</button>
+        </div>
+        <form id="hostForm" onsubmit="saveHost(event)">
+            <input type="hidden" id="formMode" value="add">
+            <div class="form-group">
+                <label>Hostname</label>
+                <input type="text" id="formName" placeholder="z.B. arrapps" required>
+            </div>
+            <div class="form-group">
+                <label>Uptime Kuma Push-URL</label>
+                <input type="url" id="formKumaUrl" placeholder="https://status.guck.tv/api/push/borg-hostname?status=up&msg=OK">
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="formEnabled" checked>
+                    Aktiv
+                </label>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn" onclick="closeModal()">Abbrechen</button>
+                <button type="submit" class="btn btn-primary">Speichern</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- ── Toast ───────────────────────────────────────────── -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

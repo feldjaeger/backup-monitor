@@ -1,0 +1,4 @@
+Flask==3.1.*
+pymongo==4.12.*
+requests==2.32.*
+gunicorn==23.*
