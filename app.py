@@ -247,6 +247,32 @@ def summary():
     })
 
 
+# ── Homepage Widget API ────────────────────────────────────────────────────
+
+@app.route("/api/homepage")
+def homepage_widget():
+    """Returns data in Homepage custom API widget format."""
+    now = datetime.utcnow()
+    hosts = list(db.hosts.find({"enabled": True}))
+    total = len(hosts)
+    ok = stale = error = 0
+    for h in hosts:
+        age_h = (now - h["last_backup"]).total_seconds() / 3600 if h.get("last_backup") else 999
+        if age_h > STALE_HOURS: stale += 1
+        elif h.get("last_status") == "error": error += 1
+        else: ok += 1
+
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_size = sum(e.get("original_size", 0) for e in db.history.find({"timestamp": {"$gte": today}}))
+
+    return jsonify([
+        {"label": "Hosts OK", "value": f"{ok}/{total}", "color": "emerald" if ok == total else "amber"},
+        {"label": "Errors", "value": str(error), "color": "red" if error else "emerald"},
+        {"label": "Stale", "value": str(stale), "color": "amber" if stale else "emerald"},
+        {"label": "Today", "value": _fmt_bytes(today_size)},
+    ])
+
+
 # ── Prometheus Metrics ──────────────────────────────────────────────────────
 
 @app.route("/metrics")
