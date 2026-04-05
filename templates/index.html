@@ -1,102 +1,295 @@
 <!DOCTYPE html>
-<html lang="de" data-theme="dark">
+<html class="dark" lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Backup Monitor – Pfannkuchen</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Sentinel – Backup Monitor</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "surface-dim": "#0b1326", "surface": "#0b1326", "surface-bright": "#31394d",
+        "surface-container-lowest": "#060e20", "surface-container-low": "#131b2e",
+        "surface-container": "#171f33", "surface-container-high": "#222a3d",
+        "surface-container-highest": "#2d3449", "surface-variant": "#2d3449",
+        "on-surface": "#dae2fd", "on-surface-variant": "#c1c6d6",
+        "primary": "#adc6ff", "primary-container": "#0069de", "on-primary": "#002e69",
+        "secondary": "#4edea3", "secondary-container": "#00a572", "on-secondary": "#003824",
+        "tertiary": "#ffb95f", "tertiary-container": "#9a6100",
+        "error": "#ffb4ab", "error-container": "#93000a", "on-error": "#690005",
+        "outline": "#8b909f", "outline-variant": "#414753",
+      },
+      fontFamily: { headline: ["Manrope"], body: ["Inter"], label: ["Inter"] },
+      borderRadius: { DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px" },
+    },
+  },
+}
+</script>
+<style>
+.material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+.pulse-ok { animation: pulse-g 2s infinite; }
+@keyframes pulse-g { 0%{box-shadow:0 0 0 0 rgba(78,222,163,.4)} 70%{box-shadow:0 0 0 10px rgba(78,222,163,0)} 100%{box-shadow:0 0 0 0 rgba(78,222,163,0)} }
+.pulse-err { animation: pulse-r 2s infinite; }
+@keyframes pulse-r { 0%{box-shadow:0 0 0 0 rgba(255,180,171,.4)} 70%{box-shadow:0 0 0 10px rgba(255,180,171,0)} 100%{box-shadow:0 0 0 0 rgba(255,180,171,0)} }
+.glass { background: rgba(45,52,73,.6); backdrop-filter: blur(20px); }
+::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #2d3449; border-radius: 3px; }
+</style>
 </head>
-<body>
-    <!-- ── Header ──────────────────────────────────────────── -->
-    <header>
-        <div class="header-left">
-            <span class="logo">🛡️</span>
-            <h1>Backup Monitor</h1>
-            <span class="subtitle">Homelab Pfannkuchen</span>
-        </div>
-        <div class="header-right">
-            <div class="pulse-dot" id="globalPulse"></div>
-            <span id="lastUpdate" class="meta-text"></span>
-            <button class="btn btn-icon" onclick="loadAll()" title="Aktualisieren">↻</button>
-            <button class="btn btn-primary" onclick="openAddHost()">+ Host</button>
-        </div>
-    </header>
+<body class="bg-surface-dim font-body text-on-surface antialiased">
 
-    <!-- ── Summary Cards ───────────────────────────────────── -->
-    <section class="summary-grid" id="summaryGrid">
-        <div class="card summary-card" id="cardTotal">
-            <div class="card-value" id="valTotal">–</div>
-            <div class="card-label">Hosts</div>
-        </div>
-        <div class="card summary-card card-ok" id="cardOk">
-            <div class="card-value" id="valOk">–</div>
-            <div class="card-label">OK</div>
-        </div>
-        <div class="card summary-card card-warn" id="cardStale">
-            <div class="card-value" id="valStale">–</div>
-            <div class="card-label">Überfällig</div>
-        </div>
-        <div class="card summary-card card-error" id="cardError">
-            <div class="card-value" id="valError">–</div>
-            <div class="card-label">Fehler</div>
-        </div>
-        <div class="card summary-card" id="cardToday">
-            <div class="card-value" id="valToday">–</div>
-            <div class="card-label">Heute</div>
-        </div>
-        <div class="card summary-card" id="cardSize">
-            <div class="card-value" id="valSize">–</div>
-            <div class="card-label">Heute gesichert</div>
-        </div>
-    </section>
-
-    <!-- ── Host Grid ───────────────────────────────────────── -->
-    <section class="host-grid" id="hostGrid"></section>
-
-    <!-- ── Detail Drawer ───────────────────────────────────── -->
-    <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
-    <aside class="drawer" id="drawer">
-        <div class="drawer-header">
-            <h2 id="drawerTitle">Host Details</h2>
-            <button class="btn btn-icon" onclick="closeDrawer()">✕</button>
-        </div>
-        <div class="drawer-body" id="drawerBody"></div>
-    </aside>
-
-    <!-- ── Add/Edit Host Modal ─────────────────────────────── -->
-    <div class="modal-overlay" id="modalOverlay" onclick="closeModal()"></div>
-    <div class="modal" id="modal">
-        <div class="modal-header">
-            <h2 id="modalTitle">Host hinzufügen</h2>
-            <button class="btn btn-icon" onclick="closeModal()">✕</button>
-        </div>
-        <form id="hostForm" onsubmit="saveHost(event)">
-            <input type="hidden" id="formMode" value="add">
-            <div class="form-group">
-                <label>Hostname</label>
-                <input type="text" id="formName" placeholder="z.B. arrapps" required>
-            </div>
-            <div class="form-group">
-                <label>Uptime Kuma Push-URL</label>
-                <input type="url" id="formKumaUrl" placeholder="https://status.guck.tv/api/push/borg-hostname?status=up&msg=OK">
-            </div>
-            <div class="form-group">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="formEnabled" checked>
-                    Aktiv
-                </label>
-            </div>
-            <div class="form-actions">
-                <button type="button" class="btn" onclick="closeModal()">Abbrechen</button>
-                <button type="submit" class="btn btn-primary">Speichern</button>
-            </div>
-        </form>
+<!-- ── Top Nav ──────────────────────────────────────────── -->
+<nav class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-slate-900/60 backdrop-blur-xl shadow-2xl shadow-slate-950/40">
+  <div class="flex items-center gap-8">
+    <span class="text-xl font-bold tracking-tighter text-white font-headline">The Sentinel</span>
+    <div class="hidden md:flex gap-1 items-center">
+      <a href="#" onclick="showPage('dashboard')" id="nav-dashboard" class="text-sm font-bold tracking-tight text-blue-400 px-3 py-1 rounded-lg font-headline">Dashboard</a>
+      <a href="#" onclick="showPage('alerts')" id="nav-alerts" class="text-sm font-medium tracking-tight text-slate-400 hover:bg-slate-800/50 px-3 py-1 rounded-lg transition-colors font-headline">Alert Center</a>
+      <a href="#" onclick="showPage('hosts')" id="nav-hosts" class="text-sm font-medium tracking-tight text-slate-400 hover:bg-slate-800/50 px-3 py-1 rounded-lg transition-colors font-headline">Backup Hosts</a>
     </div>
+  </div>
+  <div class="flex items-center gap-4">
+    <div id="sysStatus" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/50">
+      <span class="material-symbols-outlined text-sm text-secondary" style="font-variation-settings:'FILL' 1">cloud_done</span>
+      <span class="font-headline text-xs font-medium text-slate-300">System OK</span>
+    </div>
+    <button onclick="loadAll()" class="material-symbols-outlined text-slate-400 hover:bg-slate-800/50 p-2 rounded-full transition-colors">refresh</button>
+    <button onclick="openAddHost()" class="material-symbols-outlined text-slate-400 hover:bg-slate-800/50 p-2 rounded-full transition-colors">add_circle</button>
+  </div>
+</nav>
 
-    <!-- ── Toast ───────────────────────────────────────────── -->
-    <div class="toast-container" id="toastContainer"></div>
+<!-- ── Sidebar ─────────────────────────────────────────── -->
+<aside class="fixed left-0 top-0 h-full flex-col py-6 bg-slate-950 w-56 z-40 pt-20 hidden lg:flex">
+  <div class="px-5 mb-8">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center">
+        <span class="material-symbols-outlined text-white text-lg" style="font-variation-settings:'FILL' 1">shield</span>
+      </div>
+      <div>
+        <div class="text-sm font-black text-white font-headline leading-tight">The Sentinel</div>
+        <div class="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Backup Monitor</div>
+      </div>
+    </div>
+  </div>
+  <div class="flex-1 px-3 space-y-1">
+    <a href="#" onclick="showPage('dashboard')" id="side-dashboard" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-600/10 text-blue-400 border-r-2 border-blue-500 font-headline text-sm font-semibold">
+      <span class="material-symbols-outlined">dashboard</span><span>Dashboard</span>
+    </a>
+    <a href="#" onclick="showPage('alerts')" id="side-alerts" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:text-slate-300 hover:bg-slate-900/80 transition-all font-headline text-sm font-semibold">
+      <span class="material-symbols-outlined">warning</span><span>Alert Center</span>
+    </a>
+    <a href="#" onclick="showPage('hosts')" id="side-hosts" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:text-slate-300 hover:bg-slate-900/80 transition-all font-headline text-sm font-semibold">
+      <span class="material-symbols-outlined">dns</span><span>Backup Hosts</span>
+    </a>
+    <a href="#" onclick="showPage('config')" id="side-config" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:text-slate-300 hover:bg-slate-900/80 transition-all font-headline text-sm font-semibold">
+      <span class="material-symbols-outlined">settings</span><span>Configuration</span>
+    </a>
+  </div>
+  <div class="px-3 mt-auto">
+    <button onclick="openAddHost()" class="w-full bg-primary text-on-primary font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all text-sm">
+      <span class="material-symbols-outlined text-sm">add</span> New Host
+    </button>
+  </div>
+</aside>
 
-    <script src="/static/js/app.js"></script>
+<!-- ── Main Content ────────────────────────────────────── -->
+<main class="lg:ml-56 pt-24 px-6 lg:px-8 pb-12 min-h-screen">
+
+<!-- ════════ PAGE: DASHBOARD ════════ -->
+<div id="page-dashboard">
+  <!-- Header -->
+  <header class="mb-10 flex flex-col md:flex-row justify-between md:items-end gap-4">
+    <div>
+      <h1 class="text-3xl font-extrabold font-headline tracking-tight text-white">Vault Overview</h1>
+      <p class="text-on-surface-variant mt-1">Operational command for Borgmatic backup infrastructure.</p>
+    </div>
+    <div class="flex gap-3">
+      <div class="flex items-center gap-2 bg-surface-container-low px-4 py-2 rounded-lg text-sm">
+        <span class="text-on-surface-variant">Last Scan:</span>
+        <span class="text-primary font-semibold" id="lastScan">–</span>
+      </div>
+      <button onclick="loadAll()" class="bg-surface-container-highest px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-surface-bright transition-colors">
+        <span class="material-symbols-outlined text-sm">refresh</span> Refresh
+      </button>
+    </div>
+  </header>
+
+  <!-- Metric Cards -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6 mb-8" id="metricCards">
+    <div class="bg-surface-container-low p-6 rounded-xl relative overflow-hidden">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-secondary/5 rounded-full -mr-8 -mt-8 blur-2xl"></div>
+      <div class="flex justify-between items-start mb-4">
+        <div class="p-2 bg-secondary/10 rounded-lg"><span class="material-symbols-outlined text-secondary" style="font-variation-settings:'FILL' 1">check_circle</span></div>
+      </div>
+      <div class="text-4xl font-extrabold font-headline text-white mb-1" id="mOk">–</div>
+      <div class="text-xs text-on-surface-variant font-medium uppercase tracking-wider">Hosts OK</div>
+    </div>
+    <div class="bg-surface-container-low p-6 rounded-xl relative overflow-hidden">
+      <div class="flex justify-between items-start mb-4">
+        <div class="p-2 bg-primary/10 rounded-lg"><span class="material-symbols-outlined text-primary" style="font-variation-settings:'FILL' 1">database</span></div>
+      </div>
+      <div class="text-4xl font-extrabold font-headline text-white mb-1" id="mSize">–</div>
+      <div class="text-xs text-on-surface-variant font-medium uppercase tracking-wider">Today Backed Up</div>
+    </div>
+    <div class="bg-surface-container-low p-6 rounded-xl relative overflow-hidden">
+      <div class="flex justify-between items-start mb-4">
+        <div class="p-2 bg-secondary/10 rounded-lg pulse-ok"><span class="material-symbols-outlined text-secondary" style="font-variation-settings:'FILL' 1">bolt</span></div>
+        <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-secondary"></div><span class="text-xs font-bold text-secondary">LIVE</span></div>
+      </div>
+      <div class="text-2xl font-bold font-headline text-white mb-1" id="mLatest">–</div>
+      <div class="text-xs text-on-surface-variant font-medium uppercase tracking-wider">Latest Backup</div>
+      <div class="text-[10px] mt-2 font-mono text-slate-500" id="mLatestHost">–</div>
+    </div>
+    <div class="bg-surface-container-low p-6 rounded-xl" id="mWarnCard">
+      <div class="flex justify-between items-start mb-4">
+        <div class="p-2 bg-error/10 rounded-lg"><span class="material-symbols-outlined text-error" style="font-variation-settings:'FILL' 1">report_problem</span></div>
+      </div>
+      <div class="text-4xl font-extrabold font-headline text-error mb-1" id="mWarn">0</div>
+      <div class="text-xs text-on-surface-variant font-medium uppercase tracking-wider">Issues</div>
+      <button onclick="showPage('alerts')" class="mt-3 text-xs font-bold text-error flex items-center gap-1 hover:underline">
+        View alerts <span class="material-symbols-outlined text-xs">arrow_forward</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Chart + Clusters -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+    <!-- Volume Trend Chart -->
+    <div class="lg:col-span-2 bg-surface-container-low rounded-xl p-6 lg:p-8">
+      <div class="flex justify-between items-center mb-8">
+        <div>
+          <h3 class="text-lg font-bold font-headline text-white">Backup Volume Trends</h3>
+          <p class="text-sm text-on-surface-variant">Storage growth across all hosts (Last 30 Days)</p>
+        </div>
+      </div>
+      <div class="h-48 w-full relative" id="volumeChart">
+        <svg class="w-full h-full" preserveAspectRatio="none" id="chartSvg"></svg>
+      </div>
+    </div>
+    <!-- Host Clusters -->
+    <div class="bg-surface-container-low rounded-xl p-6 lg:p-8">
+      <h3 class="text-lg font-bold font-headline text-white mb-6">Host Status</h3>
+      <div class="space-y-3 max-h-[300px] overflow-y-auto" id="clusterList"></div>
+    </div>
+  </div>
+
+  <!-- Live Stream -->
+  <div class="bg-surface-container-low rounded-xl p-6 lg:p-8">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="text-lg font-bold font-headline text-white">Live Backup Stream</h3>
+      <span class="text-xs text-on-surface-variant font-mono">Auto-refresh: 30s</span>
+    </div>
+    <div class="space-y-0" id="liveStream"></div>
+  </div>
+</div>
+
+<!-- ════════ PAGE: ALERTS ════════ -->
+<div id="page-alerts" class="hidden">
+  <header class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+    <div>
+      <h1 class="text-3xl font-extrabold tracking-tighter font-headline text-white">Alert Center</h1>
+      <p class="text-on-surface-variant max-w-lg">Real-time surveillance of the backup infrastructure.</p>
+    </div>
+    <div class="flex gap-3">
+      <div class="bg-surface-container-low px-6 py-4 rounded-xl flex flex-col gap-1 border-b-2 border-error">
+        <span class="text-error font-bold text-2xl" id="aCrit">0</span>
+        <span class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold">Errors</span>
+      </div>
+      <div class="bg-surface-container-low px-6 py-4 rounded-xl flex flex-col gap-1 border-b-2 border-tertiary">
+        <span class="text-tertiary font-bold text-2xl" id="aStale">0</span>
+        <span class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold">Stale</span>
+      </div>
+    </div>
+  </header>
+  <div class="space-y-4" id="alertList">
+    <div class="text-center py-12 text-on-surface-variant">No active alerts – all systems operational ✓</div>
+  </div>
+</div>
+
+<!-- ════════ PAGE: HOSTS ════════ -->
+<div id="page-hosts" class="hidden">
+  <header class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+    <div>
+      <h1 class="text-3xl font-extrabold tracking-tighter font-headline text-white">Backup Hosts</h1>
+      <p class="text-on-surface-variant">Manage and monitor all registered backup endpoints.</p>
+    </div>
+    <button onclick="openAddHost()" class="bg-primary text-on-primary font-bold py-3 px-6 rounded-xl flex items-center gap-2 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all text-sm">
+      <span class="material-symbols-outlined text-sm">add</span> Add Host
+    </button>
+  </header>
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" id="hostGrid"></div>
+</div>
+
+<!-- ════════ PAGE: CONFIG ════════ -->
+<div id="page-config" class="hidden">
+  <header class="mb-10">
+    <h1 class="text-3xl font-extrabold tracking-tighter font-headline text-white">Configuration</h1>
+    <p class="text-on-surface-variant mt-1">API endpoint and integration settings.</p>
+  </header>
+  <div class="bg-surface-container-low rounded-xl p-8 max-w-2xl space-y-6">
+    <div>
+      <h3 class="text-sm font-bold text-on-surface-variant uppercase tracking-wider mb-3">Push Endpoint</h3>
+      <code class="block bg-surface-dim px-4 py-3 rounded-lg text-primary text-sm font-mono">POST /api/push</code>
+    </div>
+    <div>
+      <h3 class="text-sm font-bold text-on-surface-variant uppercase tracking-wider mb-3">Prometheus Metrics</h3>
+      <code class="block bg-surface-dim px-4 py-3 rounded-lg text-primary text-sm font-mono">GET /metrics</code>
+    </div>
+    <div>
+      <h3 class="text-sm font-bold text-on-surface-variant uppercase tracking-wider mb-3">API Key</h3>
+      <p class="text-sm text-on-surface-variant">{{ 'Enabled – set via API_KEY env var' if api_key_required else 'Disabled – all endpoints open' }}</p>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- ── Host Detail Drawer ──────────────────────────────── -->
+<div id="drawerBg" onclick="closeDrawer()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 opacity-0 pointer-events-none transition-opacity duration-300"></div>
+<aside id="drawer" class="fixed top-0 right-0 bottom-0 w-[500px] max-w-[90vw] bg-surface-container-lowest z-[51] shadow-2xl transform translate-x-full transition-transform duration-300 flex flex-col">
+  <div class="flex justify-between items-center px-6 py-5 border-b border-outline-variant/10">
+    <h2 class="text-lg font-bold font-headline text-white" id="drawerTitle">Host</h2>
+    <button onclick="closeDrawer()" class="material-symbols-outlined text-slate-400 hover:text-white p-1 rounded-lg hover:bg-surface-container-high transition-colors">close</button>
+  </div>
+  <div class="flex-1 overflow-y-auto px-6 py-6" id="drawerBody"></div>
+</aside>
+
+<!-- ── Add/Edit Modal ──────────────────────────────────── -->
+<div id="modalBg" onclick="closeModal()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] opacity-0 pointer-events-none transition-opacity duration-300"></div>
+<div id="modal" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[440px] max-w-[90vw] bg-surface-container-lowest rounded-xl z-[61] shadow-2xl scale-95 opacity-0 pointer-events-none transition-all duration-300">
+  <div class="flex justify-between items-center px-6 py-5 border-b border-outline-variant/10">
+    <h2 class="text-lg font-bold font-headline text-white" id="modalTitle">Add Host</h2>
+    <button onclick="closeModal()" class="material-symbols-outlined text-slate-400 hover:text-white">close</button>
+  </div>
+  <form id="hostForm" onsubmit="saveHost(event)" class="p-6 space-y-4">
+    <input type="hidden" id="formMode" value="add">
+    <div>
+      <label class="block text-xs text-on-surface-variant uppercase tracking-wider font-bold mb-2">Hostname</label>
+      <input type="text" id="formName" required class="w-full bg-surface-container-highest border-none rounded-lg px-4 py-3 text-on-surface text-sm focus:ring-2 focus:ring-primary/30" placeholder="e.g. arrapps">
+    </div>
+    <div>
+      <label class="block text-xs text-on-surface-variant uppercase tracking-wider font-bold mb-2">Uptime Kuma Push URL</label>
+      <input type="url" id="formKumaUrl" class="w-full bg-surface-container-highest border-none rounded-lg px-4 py-3 text-on-surface text-sm focus:ring-2 focus:ring-primary/30" placeholder="https://status.example.com/api/push/...">
+    </div>
+    <label class="flex items-center gap-3 cursor-pointer">
+      <input type="checkbox" id="formEnabled" checked class="rounded bg-surface-container-highest border-none text-primary focus:ring-primary/30">
+      <span class="text-sm text-on-surface">Enabled</span>
+    </label>
+    <div class="flex justify-end gap-3 pt-4">
+      <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-lg text-sm font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors">Cancel</button>
+      <button type="submit" class="bg-primary text-on-primary px-6 py-2.5 rounded-lg text-sm font-bold hover:brightness-110 active:scale-95 transition-all">Save</button>
+    </div>
+  </form>
+</div>
+
+<!-- ── Toast ───────────────────────────────────────────── -->
+<div id="toasts" class="fixed bottom-6 right-6 z-[70] flex flex-col gap-2"></div>
+
+<script src="/static/js/app.js"></script>
 </body>
 </html>
