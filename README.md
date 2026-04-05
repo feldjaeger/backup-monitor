@@ -139,6 +139,59 @@ on_error:
 |----------|---------|-------------|
 | `MONGO_URI` | `mongodb://mongo:27017` | MongoDB connection string |
 | `STALE_HOURS` | `26` | Hours without backup before host is marked stale |
+| `WEBHOOK_URLS` | _(empty)_ | Comma-separated webhook URLs for notifications |
+| `WEBHOOK_EVENTS` | `error,stale` | Events that trigger webhooks |
+
+## Prometheus Integration
+
+The `/metrics` endpoint exposes backup metrics in Prometheus format:
+
+```
+backup_hosts_total 21
+backup_host_status{host="myserver"} 1          # 1=ok, 0=error, -1=stale
+backup_host_last_seconds{host="myserver"} 3600  # seconds since last backup
+backup_host_duration_seconds{host="myserver"} 342
+backup_host_size_bytes{host="myserver"} 5368709120
+backup_host_dedup_bytes{host="myserver"} 104857600
+backup_host_files_new{host="myserver"} 47
+backup_today_total 22
+backup_today_bytes 47280909120
+```
+
+Add to your `prometheus.yml`:
+
+```yaml
+scrape_configs:
+  - job_name: 'backup-monitor'
+    static_configs:
+      - targets: ['backup-monitor:9999']
+    scrape_interval: 60s
+```
+
+## Webhook Notifications
+
+Set `WEBHOOK_URLS` to receive notifications on backup errors or stale hosts:
+
+```yaml
+environment:
+  - WEBHOOK_URLS=https://n8n.example.com/webhook/backup-alert,https://other.webhook/endpoint
+  - WEBHOOK_EVENTS=error,stale    # which events trigger webhooks
+```
+
+Webhook payload:
+
+```json
+{
+  "event": "error",
+  "host": "myserver",
+  "message": "Backup failed",
+  "timestamp": "2026-04-05T06:00:00Z"
+}
+```
+
+Events:
+- `error` – Fired immediately when a backup reports status "error"
+- `stale` – Fired when a host exceeds `STALE_HOURS` without a backup (once per host, resets on next successful backup)
 
 ## Data Retention
 
