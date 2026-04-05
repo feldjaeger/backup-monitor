@@ -1,33 +1,32 @@
-# 🛡️ Backup Monitor
+# 🛡️ The Sentinel – Backup Monitor
 
-A self-hosted backup monitoring dashboard with MongoDB backend, designed for **Borgmatic** (but works with any tool that can send HTTP requests).
+A self-hosted backup monitoring dashboard with a premium dark-theme UI, MongoDB backend, and deep integrations for Borgmatic, Uptime Kuma, Prometheus, and webhooks.
 
-![Dark Theme Dashboard](https://img.shields.io/badge/theme-dark-1a1d27?style=flat-square) ![Python](https://img.shields.io/badge/python-3.12-blue?style=flat-square) ![MongoDB](https://img.shields.io/badge/mongodb-4.4+-green?style=flat-square) ![License](https://img.shields.io/badge/license-MIT-purple?style=flat-square)
+![Dark Theme](https://img.shields.io/badge/theme-Sentinel%20Dark-0b1326?style=flat-square) ![Python](https://img.shields.io/badge/python-3.12-blue?style=flat-square) ![MongoDB](https://img.shields.io/badge/mongodb-4.4+-green?style=flat-square) ![Tailwind](https://img.shields.io/badge/tailwind-CSS-38bdf8?style=flat-square)
 
 ## Features
 
-- **Dashboard** – Real-time overview of all backup hosts with status cards
-- **Host Management** – Add, edit, disable, delete hosts via Web UI (no config files)
-- **History** – 90-day retention with per-day calendar heatmap and size charts
-- **Detailed Stats** – Duration, original/deduplicated/compressed size, file counts
-- **Uptime Kuma Integration** – Automatic push per host after each backup
-- **Stale Detection** – Configurable threshold (default: 26h) marks missed backups
+- **Sentinel UI** – Premium dark-theme dashboard built on Material 3 design tokens, Tailwind CSS, glassmorphism effects, and Manrope + Inter typography
+- **Multi-Page SPA** – Dashboard, Alert Center, Backup Hosts, Configuration
+- **Dashboard** – Bento metric cards, SVG volume trend chart, host clusters by status, live backup stream
+- **Alert Center** – Severity-based alerts (Critical/Stale) with pulse animations
+- **Host Management** – Add, edit, disable, delete hosts via Web UI
+- **Detail Drawer** – 30-day calendar heatmap, data volume chart, backup history per host
+- **Prometheus Metrics** – `/metrics` endpoint with per-host and global backup metrics
+- **Uptime Kuma Integration** – Automatic push forwarding per host after each backup
+- **Webhook Notifications** – Configurable alerts on error/stale events (n8n, Telegram, etc.)
+- **API Key Auth** – Optional authentication for write endpoints
+- **90-Day History** – MongoDB with automatic TTL cleanup
 - **Auto-Refresh** – Dashboard updates every 30 seconds
-- **Dark Theme** – Clean, modern UI with status-colored indicators
-- **Zero Config** – Hosts auto-register on first push, or add manually via UI
+- **Zero Config** – Hosts auto-register on first push
 
 ## Quick Start
 
 ```bash
-# Clone
 git clone https://github.com/feldjaeger/backup-monitor.git
 cd backup-monitor
-
-# Start
 docker compose up -d
-
-# Open
-open http://localhost:9999
+# Open http://localhost:9999
 ```
 
 ## Docker Compose
@@ -42,12 +41,15 @@ services:
       - "9999:9999"
     environment:
       - MONGO_URI=mongodb://mongo:27017
-      - STALE_HOURS=26          # Hours before a host is marked "stale"
+      - STALE_HOURS=26
+      # - API_KEY=your-secret-key      # optional: protect write endpoints
+      # - WEBHOOK_URLS=https://n8n.example.com/webhook/backup-alert
+      # - WEBHOOK_EVENTS=error,stale
     depends_on:
       - mongo
 
   mongo:
-    image: mongo:4.4            # Use 7+ if your CPU supports AVX
+    image: mongo:4.4    # Use 7+ if your CPU supports AVX
     container_name: backup-mongo
     restart: always
     volumes:
@@ -62,10 +64,10 @@ volumes:
 After each backup, send a POST request:
 
 ```bash
-# Minimal push (just hostname + status)
+# Minimal push
 curl -X POST "http://localhost:9999/api/push?host=myserver&status=ok"
 
-# Full push with stats (JSON)
+# Full push with stats
 curl -X POST -H "Content-Type: application/json" \
   -d '{
     "host": "myserver",
@@ -75,10 +77,13 @@ curl -X POST -H "Content-Type: application/json" \
     "deduplicated_size": 104857600,
     "compressed_size": 83886080,
     "nfiles_new": 47,
-    "nfiles_changed": 12,
-    "message": "Backup completed successfully"
+    "nfiles_changed": 12
   }' \
   http://localhost:9999/api/push
+
+# With API key
+curl -X POST -H "X-API-Key: your-key" \
+  "http://localhost:9999/api/push?host=myserver&status=ok"
 ```
 
 ### Borgmatic Integration
@@ -114,51 +119,35 @@ on_error:
 
 ## API Reference
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/` | Web UI |
-| `GET/POST` | `/api/push` | Push backup status (query params or JSON) |
-| `GET` | `/api/hosts` | List all hosts with current status |
-| `POST` | `/api/hosts` | Add a host `{"name": "...", "kuma_push_url": "..."}` |
-| `PUT` | `/api/hosts/<name>` | Update host `{"enabled": bool, "kuma_push_url": "..."}` |
-| `DELETE` | `/api/hosts/<name>` | Delete host and all history |
-| `GET` | `/api/history/<host>?days=30` | Backup history for a host |
-| `GET` | `/api/calendar/<host>?days=30` | Calendar heatmap data (aggregated by day) |
-| `GET` | `/api/summary` | Dashboard summary (counts, today stats) |
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/` | ❌ | Web UI |
+| `GET` | `/metrics` | ❌ | Prometheus metrics |
+| `GET` | `/api/summary` | ❌ | Dashboard summary |
+| `GET` | `/api/hosts` | ❌ | List all hosts with status |
+| `GET` | `/api/history/<host>?days=30` | ❌ | Backup history |
+| `GET` | `/api/calendar/<host>?days=30` | ❌ | Calendar heatmap data |
+| `POST` | `/api/push` | 🔑 | Push backup status |
+| `POST` | `/api/hosts` | 🔑 | Add a host |
+| `PUT` | `/api/hosts/<name>` | 🔑 | Update host settings |
+| `DELETE` | `/api/hosts/<name>` | 🔑 | Delete host and history |
 
-## Uptime Kuma Integration
-
-1. Create a **Push** monitor in Uptime Kuma for each host
-2. Copy the push URL (e.g. `https://status.example.com/api/push/borg-myserver?status=up&msg=OK`)
-3. In Backup Monitor: Click on a host → Edit → Paste the Kuma Push URL
-4. After each backup push, Backup Monitor automatically forwards the status to Uptime Kuma
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MONGO_URI` | `mongodb://mongo:27017` | MongoDB connection string |
-| `STALE_HOURS` | `26` | Hours without backup before host is marked stale |
-| `WEBHOOK_URLS` | _(empty)_ | Comma-separated webhook URLs for notifications |
-| `WEBHOOK_EVENTS` | `error,stale` | Events that trigger webhooks |
+🔑 = requires `API_KEY` if set (via `X-API-Key` header or `?api_key=` query param)
 
 ## Prometheus Integration
-
-The `/metrics` endpoint exposes backup metrics in Prometheus format:
 
 ```
 backup_hosts_total 21
 backup_host_status{host="myserver"} 1          # 1=ok, 0=error, -1=stale
-backup_host_last_seconds{host="myserver"} 3600  # seconds since last backup
+backup_host_last_seconds{host="myserver"} 3600
 backup_host_duration_seconds{host="myserver"} 342
 backup_host_size_bytes{host="myserver"} 5368709120
 backup_host_dedup_bytes{host="myserver"} 104857600
-backup_host_files_new{host="myserver"} 47
 backup_today_total 22
 backup_today_bytes 47280909120
 ```
 
-Add to your `prometheus.yml`:
+Add to `prometheus.yml`:
 
 ```yaml
 scrape_configs:
@@ -170,15 +159,13 @@ scrape_configs:
 
 ## Webhook Notifications
 
-Set `WEBHOOK_URLS` to receive notifications on backup errors or stale hosts:
-
 ```yaml
 environment:
-  - WEBHOOK_URLS=https://n8n.example.com/webhook/backup-alert,https://other.webhook/endpoint
-  - WEBHOOK_EVENTS=error,stale    # which events trigger webhooks
+  - WEBHOOK_URLS=https://n8n.example.com/webhook/backup-alert
+  - WEBHOOK_EVENTS=error,stale
 ```
 
-Webhook payload:
+Payload:
 
 ```json
 {
@@ -189,28 +176,39 @@ Webhook payload:
 }
 ```
 
-Events:
-- `error` – Fired immediately when a backup reports status "error"
-- `stale` – Fired when a host exceeds `STALE_HOURS` without a backup (once per host, resets on next successful backup)
+## Uptime Kuma Integration
 
-## Data Retention
+1. Create a Push monitor in Uptime Kuma
+2. In Backup Monitor: Host → Edit → paste Kuma Push URL
+3. After each backup, status is automatically forwarded to Kuma
 
-- History entries are automatically deleted after **90 days** (MongoDB TTL index)
-- Hosts are never auto-deleted – remove them manually via UI or API
+## Environment Variables
 
-## Screenshots
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MONGO_URI` | `mongodb://mongo:27017` | MongoDB connection |
+| `STALE_HOURS` | `26` | Hours without backup → stale |
+| `API_KEY` | _(empty)_ | Set to enable auth on write endpoints |
+| `WEBHOOK_URLS` | _(empty)_ | Comma-separated notification URLs |
+| `WEBHOOK_EVENTS` | `error,stale` | Events that trigger webhooks |
 
-### Dashboard
-Dark-themed overview with summary cards, host grid with status badges, and 14-day minibar charts per host.
+## Design System
 
-### Host Detail
-Slide-out drawer with 30-day calendar heatmap, data volume chart, and detailed backup history table.
+The UI follows **The Sentinel** design language:
+
+- **Colors:** Material 3 tonal palette with deep slate surfaces (`#0b1326` → `#2d3449`)
+- **Typography:** Manrope (headlines) + Inter (body/data)
+- **No-Line Rule:** Card boundaries via background color shifts, no 1px borders
+- **Glass Effect:** Backdrop-blur on navigation and overlays
+- **Pulse Animations:** Status indicators with two-tone glow effects
+- **Tonal Depth:** Layered surfaces creating architectural permanence
 
 ## Tech Stack
 
 - **Backend:** Python 3.12, Flask, Gunicorn
 - **Database:** MongoDB 4.4+
-- **Frontend:** Vanilla JS, CSS (no framework dependencies)
+- **Frontend:** Tailwind CSS, Vanilla JS, Material Symbols, Google Fonts
+- **No build step** – Tailwind loaded via CDN
 
 ## License
 
