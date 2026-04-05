@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
 Backup Monitor – Backend
-MongoDB-backed backup monitoring with Web UI and Uptime Kuma integration.
+MongoDB-backed backup monitoring with Web UI, Uptime Kuma, Prometheus & Webhook integration.
 """
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, render_template, Response
 from pymongo import MongoClient, DESCENDING
 from datetime import datetime, timedelta
-import os, time, requests, logging
+import os, time, requests, logging, threading
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -65,6 +65,13 @@ def push():
             requests.get(h["kuma_push_url"], params={"status": status_param, "msg": msg}, timeout=5)
         except Exception as e:
             log.warning(f"Kuma push failed for {host}: {e}")
+
+    # Webhooks
+    if entry["status"] == "error":
+        _send_webhooks("error", host, entry.get("message", "Backup fehlgeschlagen"))
+
+    # Check for stale hosts
+    _check_stale_hosts()
 
     return jsonify({"ok": True, "host": host})
 
@@ -215,6 +222,108 @@ def summary():
         "total_hosts": total, "ok": ok, "stale": stale, "error": error,
         "today_backups": today_backups, "today_size": today_size,
     })
+
+
+# ── Prometheus Metrics ──────────────────────────────────────────────────────
+
+@app.route("/metrics")
+def prometheus_metrics():
+    now = datetime.utcnow()
+    hosts = list(db.hosts.find())
+    lines = [
+        "# HELP backup_hosts_total Total number of monitored hosts",
+        "# TYPE backup_hosts_total gauge",
+        f"backup_hosts_total {len([h for h in hosts if h.get('enabled', True)])}",
+        "# HELP backup_host_last_seconds Seconds since last backup",
+        "# TYPE backup_host_last_seconds gauge",
+        "# HELP backup_host_status Backup status (1=ok, 0=error, -1=stale, -2=disabled)",
+        "# TYPE backup_host_status gauge",
+        "# HELP backup_host_duration_seconds Duration of last backup",
+        "# TYPE backup_host_duration_seconds gauge",
+        "# HELP backup_host_size_bytes Original size of last backup",
+        "# TYPE backup_host_size_bytes gauge",
+        "# HELP backup_host_dedup_bytes Deduplicated size of last backup",
+        "# TYPE backup_host_dedup_bytes gauge",
+        "# HELP backup_host_files_new New files in last backup",
+        "# TYPE backup_host_files_new gauge",
+    ]
+    for h in hosts:
+        name = h["name"]
+        labels = f'host="{name}"'
+        age = (now - h["last_backup"]).total_seconds() if h.get("last_backup") else 999999
+
+        if not h.get("enabled", True):
+            status_val = -2
+        elif age > STALE_HOURS * 3600:
+            status_val = -1
+        elif h.get("last_status") == "error":
+            status_val = 0
+        else:
+            status_val = 1
+
+        lines.append(f"backup_host_last_seconds{{{labels}}} {int(age)}")
+        lines.append(f"backup_host_status{{{labels}}} {status_val}")
+
+        last = db.history.find_one({"host": name}, sort=[("timestamp", DESCENDING)])
+        if last:
+            lines.append(f'backup_host_duration_seconds{{{labels}}} {last.get("duration_sec", 0)}')
+            lines.append(f'backup_host_size_bytes{{{labels}}} {last.get("original_size", 0)}')
+            lines.append(f'backup_host_dedup_bytes{{{labels}}} {last.get("deduplicated_size", 0)}')
+            lines.append(f'backup_host_files_new{{{labels}}} {last.get("nfiles_new", 0)}')
+
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_count = db.history.count_documents({"timestamp": {"$gte": today}})
+    today_size = sum(e.get("original_size", 0) for e in db.history.find({"timestamp": {"$gte": today}}))
+    lines += [
+        "# HELP backup_today_total Backups completed today",
+        "# TYPE backup_today_total gauge",
+        f"backup_today_total {today_count}",
+        "# HELP backup_today_bytes Total bytes backed up today",
+        "# TYPE backup_today_bytes gauge",
+        f"backup_today_bytes {today_size}",
+    ]
+    return Response("\n".join(lines) + "\n", mimetype="text/plain; version=0.0.4")
+
+
+# ── Webhooks (Notifications) ──────────────────────────────────────────────
+
+WEBHOOK_URLS = [u.strip() for u in os.environ.get("WEBHOOK_URLS", "").split(",") if u.strip()]
+WEBHOOK_EVENTS = os.environ.get("WEBHOOK_EVENTS", "error,stale").split(",")
+
+
+def _send_webhooks(event, host, message):
+    """Fire webhooks in background thread."""
+    if event not in WEBHOOK_EVENTS or not WEBHOOK_URLS:
+        return
+    payload = {
+        "event": event,
+        "host": host,
+        "message": message,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }
+    def _fire():
+        for url in WEBHOOK_URLS:
+            try:
+                requests.post(url, json=payload, timeout=10)
+            except Exception as e:
+                log.warning(f"Webhook failed ({url}): {e}")
+    threading.Thread(target=_fire, daemon=True).start()
+
+
+# ── Stale Check (runs after each push) ────────────────────────────────────
+
+def _check_stale_hosts():
+    """Check all hosts for stale status and fire webhooks."""
+    now = datetime.utcnow()
+    for h in db.hosts.find({"enabled": True}):
+        if not h.get("last_backup"):
+            continue
+        age_h = (now - h["last_backup"]).total_seconds() / 3600
+        if age_h > STALE_HOURS and not h.get("_stale_notified"):
+            _send_webhooks("stale", h["name"], f"Kein Backup seit {int(age_h)}h")
+            db.hosts.update_one({"name": h["name"]}, {"$set": {"_stale_notified": True}})
+        elif age_h <= STALE_HOURS and h.get("_stale_notified"):
+            db.hosts.update_one({"name": h["name"]}, {"$unset": {"_stale_notified": ""}})
 
 
 # ── Web UI ─────────────────────────────────────────────────────────────────
