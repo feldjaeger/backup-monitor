@@ -2,7 +2,7 @@
 
 A self-hosted backup monitoring dashboard with a premium dark-theme UI, MongoDB backend, and deep integrations for Borgmatic, Uptime Kuma, Prometheus, and webhooks.
 
-![Dark Theme](https://img.shields.io/badge/theme-Sentinel%20Dark-0b1326?style=flat-square) ![Python](https://img.shields.io/badge/python-3.12-blue?style=flat-square) ![MongoDB](https://img.shields.io/badge/mongodb-4.4+-green?style=flat-square) ![Tailwind](https://img.shields.io/badge/tailwind-CSS-38bdf8?style=flat-square)
+![Dark Theme](https://img.shields.io/badge/theme-Sentinel%20Dark-0b1326?style=flat-square) ![Python](https://img.shields.io/badge/python-3.12-blue?style=flat-square) ![MongoDB](https://img.shields.io/badge/mongodb-8-green?style=flat-square) ![Tailwind](https://img.shields.io/badge/tailwind-CSS-38bdf8?style=flat-square)
 
 ## Features
 
@@ -49,7 +49,7 @@ services:
       - mongo
 
   mongo:
-    image: mongo:4.4    # Use 7+ if your CPU supports AVX
+    image: mongo:8
     container_name: backup-mongo
     restart: always
     volumes:
@@ -65,7 +65,9 @@ After each backup, send a POST request:
 
 ```bash
 # Minimal push
-curl -X POST "http://localhost:9999/api/push?host=myserver&status=ok"
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"host":"myserver","status":"ok"}' \
+  http://localhost:9999/api/push
 
 # Full push with stats
 curl -X POST -H "Content-Type: application/json" \
@@ -82,8 +84,9 @@ curl -X POST -H "Content-Type: application/json" \
   http://localhost:9999/api/push
 
 # With API key
-curl -X POST -H "X-API-Key: your-key" \
-  "http://localhost:9999/api/push?host=myserver&status=ok"
+curl -X POST -H "X-API-Key: your-key" -H "Content-Type: application/json" \
+  -d '{"host":"myserver","status":"ok"}' \
+  http://localhost:9999/api/push
 ```
 
 ### Borgmatic Integration
